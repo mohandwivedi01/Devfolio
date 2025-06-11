@@ -11,19 +11,16 @@ export class AuthService {
         private userModel: Model<User>
     ) {}
 
-    async signup1(data: {username: string; password: string }): Promise<{ message: string }> {
-        try {
-            console.log('******inside auth service*****');
-            return { message: `User ${data.username} signed up successfully` };
-        } catch (error) {
-            throw new BadRequestException(error.message);
-        }
-    }
-
     async signup(data: ISignupUserDTO) {
-        console.log("******auth service data*****", data);
+        const existingUser = await this.userModel.findOne({
+            email: data.email
+        })
+
+        if (existingUser) {
+            throw new BadRequestException('User already exists');
+        }
+
         const user = new this.userModel(data);
-        console.log("****user*****: ", user);
         return user.save();
     }
 }

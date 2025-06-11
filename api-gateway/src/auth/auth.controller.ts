@@ -1,50 +1,45 @@
-import { Controller, Get, Inject, Post } from "@nestjs/common";
-import { ClientProxy } from "@nestjs/microservices";
-import { firstValueFrom } from "rxjs";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Post,
+  Request,
+} from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
+import { SignupDTO } from './DTO/index';
 
 @Controller('auth')
 export class AuthController {
-    constructor(
-        @Inject('USER_SERVICE')
-        private readonly userService: ClientProxy,
-    ) {}
+  constructor(
+    @Inject('USER_SERVICE')
+    private readonly userService: ClientProxy,
+  ) {}
 
-    @Post('signup')
-    async signup() {
-        try {
-            console.log('******inside API getway controller*****');
-            return await firstValueFrom(
-                this.userService.send(
-                    { cmd: 'signup' },
-                    { email: 'mohan.dwivedi@gmail.com', name: "Mohan Dwwivedi", password: 'password123' } // Example payload, replace with actual data
-                )
-            )
-        } catch (error: any) {
-            console.error('Error during signup:', error);
-            throw error; // Re-throw the error for proper handling            
-        }
+  @Post('signup')
+  async signup(@Body() body: SignupDTO) {
+    try {
+        console.log(SignupDTO);
+      return await firstValueFrom(
+        this.userService.send({ cmd: 'signup' }, { ...body }),
+      );
+    } catch (error: any) {
+      throw new HttpException(
+        {
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: error.message,
+            success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
+  }
 
-    @Post('signup1')
-    async signup1(): Promise<any> {
-        try {
-            console.log('******inside API getway controller*****');
-            const response = await firstValueFrom(
-                this.userService.send(
-                    { cmd: 'userSignup' },
-                    { username: 'Mohan Dev', password: 'password123' } // Example payload, replace with actual data
-                )
-            )
-            console.log('******auth controller response*****', response);
-            return response;
-        } catch (error: any) {
-            console.error('Error during signup:', error);
-            throw error; // Re-throw the error for proper handling            
-        }
-    }
-
-    @Get()
-    test() {
-        return "i'm running1234zxcvbnm.....";
-    }
+  @Get()
+  test() {
+    return "i'm running1234zxcvbnm.....";
+  }
 }
