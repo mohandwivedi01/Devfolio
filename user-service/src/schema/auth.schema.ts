@@ -30,6 +30,11 @@ export class User {
         type: String,
     })
     profilePictureUrl: string
+
+    @Prop({
+        type: String,
+    })
+    refreshToken: string
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

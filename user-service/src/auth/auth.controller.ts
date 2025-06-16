@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { MessagePattern, RpcException } from '@nestjs/microservices';
-import { ISignupUserDTO } from './DTO/index';
+import { IAccessToken, ISignupUserDTO } from './DTO/index';
 
 @Controller()
 export class AuthController {
@@ -10,12 +10,7 @@ export class AuthController {
   @MessagePattern({ cmd: 'signup' })
   async signup(data: ISignupUserDTO) {
     try {
-      const response = await this.authService.signup(data);
-      return {
-        statusCode: 200,
-        message: 'User signed up successfully.',
-        data: response,
-      };
+      return await this.authService.signup(data);
     } catch (error) {
       if (error instanceof Error) {
         throw new RpcException(error.message);
@@ -23,4 +18,5 @@ export class AuthController {
       throw new RpcException('something went wrong while signing up.');
     }
   }
+
 }

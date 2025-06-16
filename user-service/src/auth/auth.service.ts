@@ -1,26 +1,75 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { User } from "src/schema/auth.schema";
-import { ISignupUserDTO } from './DTO/index';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from 'src/schema/auth.schema';
+import { IAccessToken, ISignupUserDTO } from './DTO/index';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-    constructor(
-        @InjectModel(User.name)
-        private userModel: Model<User>
-    ) {}
+  constructor(
+    @InjectModel(User.name)
+    private userModel: Model<User>,
+    private readonly jwtService: JwtService,
+  ) {}
 
-    async signup(data: ISignupUserDTO) {
-        const existingUser = await this.userModel.findOne({
-            email: data.email
-        })
+  async accessToken(data: IAccessToken): Promise<any> {
+    const accessToken = await this.jwtService.signAsync(data, {
+      secret: process.env.ACCESS_TOKEN_SECRET,
+      expiresIn: '1h',
+    });
 
-        if (existingUser) {
-            throw new BadRequestException('User already exists');
-        }
+    const refreshToken = await this.jwtService.signAsync(data, {
+      secret: process.env.REFRESH_TOKEN_SECRET,
+      expiresIn: '24h',
+    });
 
-        const user = new this.userModel(data);
-        return user.save();
+    return { accessToken, refreshToken };
+  }
+
+  async signup(data: ISignupUserDTO) {
+    const existingUser = await this.userModel.findOne({
+      email: data.email,
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('User already exists');
     }
+
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
+    const user = new this.userModel({
+      email: data.email,
+      name: data.name,
+      password: hashedPassword,
+    });
+
+    const { accessToken, refreshToken } = await this.accessToken({
+      id: user._id.toString(),
+      email: user.email,
+    });
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+
+    user.refreshToken = hashedRefreshToken;
+
+    const savedUser = await user.save();
+
+    return {
+      refreshToken,
+      response: {
+        statusCode: 200,
+        message: 'User signed up successfully.',
+        data: {
+          accessToken,
+          user: {
+            id: savedUser._id,
+            name: savedUser.name,
+            email: savedUser.email,
+          },
+        },
+      },
+    };
+  }
 }
