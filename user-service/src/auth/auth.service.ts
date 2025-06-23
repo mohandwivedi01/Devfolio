@@ -5,7 +5,6 @@ import { User } from 'src/schema/auth.schema';
 import { IAccessToken, ISignupUserDTO, ISigninUserDTO } from './DTO/index';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { IAccessToken, ISignupUserDTO } from './DTO/index';
 import {
   GenerateTokenResponse,
   SignupResponseDTO,
@@ -78,7 +77,6 @@ export class AuthService {
     };
   }
 
-
   async signin(data: ISigninUserDTO) {
     const existingUser = await this.userModel.findOne({
       email: data.email,
@@ -95,12 +93,13 @@ export class AuthService {
     if (!matchPassword) {
       throw new BadRequestException('Email or password is incorrect!');
     }
-    const { accessToken, refreshToken } = await this.accessToken({
-      id: user._id.toString(),
-      email: user.email,
+
+    const { accessToken, refreshToken } = await this.generateToken({
+      id: existingUser._id.toString(),
+      email: existingUser.email,
     });
 
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
 
     const savedUser = await this.userModel.findOneAndUpdate(existingUser._id, {
       refreshToken: hashedRefreshToken,
@@ -113,11 +112,7 @@ export class AuthService {
         message: 'User signed up successfully.',
         data: {
           accessToken,
-          user: {
-            id: savedUser._id,
-            name: savedUser.name,
-            email: savedUser.email,
-          },
+          user: savedUser,
         },
       },
     };
