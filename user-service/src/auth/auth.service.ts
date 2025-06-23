@@ -2,9 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from 'src/schema/auth.schema';
-import { IAccessToken, ISignupUserDTO } from './DTO/index';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { IAccessToken, ISignupUserDTO } from './DTO/index';
+import {
+  GenerateTokenResponse,
+  SignupResponseDTO,
+} from './DTO/response-DTO/index';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +18,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async accessToken(data: IAccessToken): Promise<any> {
+  async generateToken(data: IAccessToken): Promise<GenerateTokenResponse> {
     const accessToken = await this.jwtService.signAsync(data, {
       secret: process.env.ACCESS_TOKEN_SECRET,
       expiresIn: '1h',
@@ -28,7 +32,7 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  async signup(data: ISignupUserDTO) {
+  async signup(data: ISignupUserDTO): Promise<SignupResponseDTO> {
     const existingUser = await this.userModel.findOne({
       email: data.email,
     });
@@ -45,7 +49,7 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    const { accessToken, refreshToken } = await this.accessToken({
+    const { accessToken, refreshToken } = await this.generateToken({
       id: user._id.toString(),
       email: user.email,
     });
@@ -64,7 +68,7 @@ export class AuthService {
         data: {
           accessToken,
           user: {
-            id: savedUser._id,
+            id: savedUser._id.toString(),
             name: savedUser.name,
             email: savedUser.email,
           },
@@ -72,4 +76,6 @@ export class AuthService {
       },
     };
   }
+
+  //   async login(data: IloginDTO) {}/
 }
