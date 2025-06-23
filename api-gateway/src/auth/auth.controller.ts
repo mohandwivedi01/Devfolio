@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  Patch,
   Post,
   Res,
 } from '@nestjs/common';
@@ -52,8 +53,49 @@ export class AuthController {
     }
   }
 
-  @Get()
-  test() {
-    return "i'm running1234zxcvbnm.....";
+  @Post('signin')
+  async signin(
+    @Body() data: any,
+  ): Promise<any> {
+    try {
+      return await firstValueFrom(
+        this.userService.send(
+          { cmd: 'signin' },
+          { ...data },
+        )
+      )
+    } catch (error: any) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: error.message,
+          success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Patch('updateUser')
+  async updateUser(
+    @Body() data: any,
+  ): Promise<any> {
+    try {
+      return await firstValueFrom(
+        this.userService.send(
+          { cmd: 'updateUser' },
+          { ...data },
+        ),
+      );
+    } catch (error: any) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: error.message,
+          success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

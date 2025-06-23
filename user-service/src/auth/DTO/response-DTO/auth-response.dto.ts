@@ -19,3 +19,4 @@ export interface SignupResponseDTO {
   refreshToken: string;
   response: SignupResponse;
 }
+

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from 'src/schema/auth.schema';
@@ -9,6 +13,8 @@ import {
   GenerateTokenResponse,
   SignupResponseDTO,
 } from './DTO/response-DTO/index';
+import { IUserInfoDTO } from './DTO/updateUser.dto';
+import { IUserChangePassword } from './DTO/changePassword.dto';
 
 @Injectable()
 export class AuthService {
@@ -77,7 +83,7 @@ export class AuthService {
     };
   }
 
-  async signin(data: ISigninUserDTO) {
+  async signin(data: ISigninUserDTO): Promise<any> {
     const existingUser = await this.userModel.findOne({
       email: data.email,
     });
@@ -90,6 +96,7 @@ export class AuthService {
       data.password,
       existingUser.password,
     );
+
     if (!matchPassword) {
       throw new BadRequestException('Email or password is incorrect!');
     }
@@ -103,7 +110,7 @@ export class AuthService {
 
     const savedUser = await this.userModel.findOneAndUpdate(existingUser._id, {
       refreshToken: hashedRefreshToken,
-    });
+    }, { new: true }).select('-password');
 
     return {
       refreshToken,
@@ -116,5 +123,70 @@ export class AuthService {
         },
       },
     };
+  }
+
+  async changePassword(data: IUserChangePassword): Promise<any> {
+    try {
+      if (data.newPassword === data.oldPassword) {
+        throw new BadRequestException(
+          'New password cannot be same as old password.',
+        );
+      }
+      const isUserExists = await this.userModel.findById(data.id);
+
+      if (!isUserExists) {
+        throw new NotFoundException('User not found.');
+      }
+
+      const isOldPasswordCorrect = bcrypt.compare(
+        data.oldPassword,
+        isUserExists.password,
+      );
+
+      if (!isOldPasswordCorrect) {
+        throw new BadRequestException('Password is incorrect.');
+      }
+
+      const hashNewPassword = bcrypt.hash(data.newPassword, 12);
+      const updatePassword = await this.userModel.findByIdAndUpdate(data.id, {
+        $set: {
+          password: hashNewPassword,
+        },
+      });
+
+      return {
+        statusCode: 200,
+        message: 'User details updated successfully.',
+        success: true,
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  async updateUser(data: IUserInfoDTO): Promise<any> {
+    try {
+      const isUserExists = await this.userModel.findById(data.id);
+
+      if (!isUserExists) {
+        throw new NotFoundException('User not found.');
+      }
+
+      const updatedUser = await this.userModel.findByIdAndUpdate(data.id, {
+        $set: {
+          name: data.name,
+          email: data.email,
+          bioSummary: data.bioSummary,
+        },
+      });
+
+      return {
+        statusCode: 200,
+        message: 'User details updated successfully.',
+        data: updatedUser,
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }
