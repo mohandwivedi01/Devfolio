@@ -98,4 +98,27 @@ export class AuthController {
       );
     }
   }
+
+  @Patch('changePassword')
+  async changePassword(
+    @Body() data:any,
+  ):Promise<any>{
+    try {
+      return await firstValueFrom(
+        this.userService.send(
+          {cmd:'changePassword'},
+          { ...data }
+        ),
+      );
+    } catch (error) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: error.message,
+          success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }
