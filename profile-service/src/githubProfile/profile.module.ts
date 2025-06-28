@@ -5,6 +5,9 @@ import { Contribution, contributionSchema } from 'src/schema/githubSchema/contri
 import { Github, githubSchema } from 'src/schema/githubSchema/github.schema';
 import { Language, languageSchema } from 'src/schema/githubSchema/language.schema';
 import { Profile, profileSchema } from 'src/schema/profile.schema';
+import { ProfileController } from './profile.controller';
+import { ProfileService } from './profile.service';
+import { Repository, repositorySchema } from 'src/schema/githubSchema/repository.schema';
 
 @Global()
 @Module({
@@ -35,9 +38,15 @@ import { Profile, profileSchema } from 'src/schema/profile.schema';
           return githubSchema;
         },
       },
+      {
+        name: Repository.name,
+        useFactory: () => {
+          return repositorySchema;
+        },
+      },
     ]),
   ],
-  controllers: [],
-  providers: [],
+  controllers: [ProfileController],
+  providers: [ProfileService],
 })
 export class githubProfileModule {}
