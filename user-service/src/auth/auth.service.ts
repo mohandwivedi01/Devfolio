@@ -1,20 +1,26 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from 'src/schema/auth.schema';
-import { IAccessToken, ISignupUserDTO, ISigninUserDTO } from './DTO/index';
+import { ISignupUserDTO, ISigninUserDTO, IValidateTokenDTO, GenerateAccessTokenDTO, ILogoutUserDTO } from './DTO/index';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import {
-  GenerateTokenResponse,
+  ReGenerateAccessTokenResponseDTO,
+  SigninResponseDTO,
   SignupResponseDTO,
+  UpdateUserResponseDTO,
+  ValidateUserDTO,
 } from './DTO/response-DTO/index';
 import { IUserInfoDTO } from './DTO/updateUser.dto';
 import { IUserChangePassword } from './DTO/changePassword.dto';
+import { SuccessResponseDTO } from './DTO/response-DTO/common.dto';
 
 @Injectable()
 export class AuthService {
@@ -24,18 +30,76 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async generateToken(data: IAccessToken): Promise<GenerateTokenResponse> {
-    const accessToken = await this.jwtService.signAsync(data, {
-      secret: process.env.ACCESS_TOKEN_SECRET,
-      expiresIn: '1h',
-    });
+  async reGenerateAccessToken(data: GenerateAccessTokenDTO): Promise<ReGenerateAccessTokenResponseDTO> {
+    const { refreshToken } = data;
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+      });
+    } catch (err) {
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
 
-    const refreshToken = await this.jwtService.signAsync(data, {
-      secret: process.env.REFRESH_TOKEN_SECRET,
-      expiresIn: '24h',
-    });
+    const user = await this.userModel.findById(payload.userId);
 
-    return { accessToken, refreshToken };
+    if (!user || user.refreshToken) {
+      throw new NotFoundException(
+        'Refresh token not found or user does not exist.',
+      );
+    }
+
+    const tokenMatches = await bcrypt.compare(refreshToken, user.refreshToken);
+
+    if (!tokenMatches) {
+      throw new UnauthorizedException('Refresh token mismatch.');
+    }
+
+    const newAccessToken = await this.jwtService.signAsync(
+      {
+        userId: user._id,
+      },
+      {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+        expiresIn: 'id',
+      },
+    );
+
+    return {
+      statusCode: 200,
+      message: 'Access token fetched successfully.',
+      data: {
+        token: newAccessToken,
+      },
+    };
+  }
+
+  async validateUser(data: IValidateTokenDTO): Promise<ValidateUserDTO> {
+    const { userId, token } = data;
+
+    const user = await this.userModel.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+      });
+    } catch (error) {
+      console.error('Token validation error: ', error.message);
+    }
+
+    if (user._id.toString() !== payload.userId) {
+      throw new BadRequestException('Invalid token');
+    }
+
+    return {
+      userId: user._id.toString(),
+      email: user.email,
+      success: true,
+    };
   }
 
   async signup(data: ISignupUserDTO): Promise<SignupResponseDTO> {
@@ -44,7 +108,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('User already exists');
+      throw new BadRequestException('User already exists with this email id');
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
@@ -55,10 +119,25 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    const { accessToken, refreshToken } = await this.generateToken({
-      id: user._id.toString(),
-      email: user.email,
-    });
+    const accessToken = await this.jwtService.signAsync(
+      {
+        userId: user._id,
+      },
+      {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+        expiresIn: '1d',
+      },
+    );
+
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        userId: user._id,
+      },
+      {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+        expiresIn: '30d',
+      },
+    );
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
@@ -67,23 +146,21 @@ export class AuthService {
     const savedUser = await user.save();
 
     return {
-      refreshToken,
-      response: {
-        statusCode: 200,
-        message: 'User signed up successfully.',
-        data: {
-          accessToken,
-          user: {
-            id: savedUser._id.toString(),
-            name: savedUser.name,
-            email: savedUser.email,
-          },
+      statusCode: 200,
+      message: 'User signed up successfully.',
+      data: {
+        accessToken,
+        refreshToken,
+        user: {
+          id: savedUser._id.toString(),
+          name: savedUser.name,
+          email: savedUser.email,
         },
       },
     };
   }
 
-  async signin(data: ISigninUserDTO): Promise<any> {
+  async signin(data: ISigninUserDTO): Promise<SigninResponseDTO> {
     const existingUser = await this.userModel.findOne({
       email: data.email,
     });
@@ -101,31 +178,58 @@ export class AuthService {
       throw new BadRequestException('Email or password is incorrect!');
     }
 
-    const { accessToken, refreshToken } = await this.generateToken({
-      id: existingUser._id.toString(),
-      email: existingUser.email,
-    });
+    const accessToken = await this.jwtService.signAsync(
+      {
+        userId: existingUser._id,
+      },
+      {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+        expiresIn: '1d',
+      },
+    );
+
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        userId: existingUser._id,
+      },
+      {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+        expiresIn: '30d',
+      },
+    );
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
 
-    const savedUser = await this.userModel.findOneAndUpdate(existingUser._id, {
-      refreshToken: hashedRefreshToken,
-    }, { new: true }).select('-password');
+    const savedUser = await this.userModel.findOneAndUpdate(
+      existingUser._id,
+      {
+        refreshToken: hashedRefreshToken,
+      },
+      { new: true },
+    );
+
+    if (!savedUser) {
+      throw new InternalServerErrorException('Something went wrong while signing up.');
+    }
 
     return {
-      refreshToken,
-      response: {
-        statusCode: 200,
-        message: 'User signed up successfully.',
-        data: {
-          accessToken,
-          user: savedUser,
+      statusCode: 200,
+      message: 'User signed n up successfully.',
+      data: {
+        accessToken,
+        refreshToken,
+        user: {
+          id: (savedUser._id).toString(),
+          name: savedUser.name,
+          email: savedUser.email,
+          bioSummary: savedUser?.bioSummary ?? null,
+          profilePictureUrl: savedUser?.profilePictureUrl ?? null,
         },
       },
     };
   }
 
-  async changePassword(data: IUserChangePassword): Promise<any> {
+  async changePassword(data: IUserChangePassword): Promise<SuccessResponseDTO> {
     try {
       if (data.newPassword === data.oldPassword) {
         throw new BadRequestException(
@@ -164,7 +268,7 @@ export class AuthService {
     }
   }
 
-  async updateUser(data: IUserInfoDTO): Promise<any> {
+  async updateUser(data: IUserInfoDTO): Promise<UpdateUserResponseDTO | any> {
     try {
       const isUserExists = await this.userModel.findById(data.id);
 
@@ -180,13 +284,41 @@ export class AuthService {
         },
       });
 
+      if (!updatedUser) {
+      throw new InternalServerErrorException('Something went wrong while signing up.');
+    }
+
       return {
         statusCode: 200,
         message: 'User details updated successfully.',
-        data: updatedUser,
+        data: {
+          id: (updatedUser._id).toString(),
+          name: updatedUser.name,
+          email: updatedUser.email,
+          bioSummary: updatedUser?.bioSummary ?? null,
+          profilePictureUrl: updatedUser?.profilePictureUrl ?? null,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
     }
+  }
+
+  async logoutUser(data: ILogoutUserDTO): Promise<SuccessResponseDTO> {
+    const { userId } = data;
+    const user = await this.userModel.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    user.refreshToken = '';
+    await user.save();
+
+    return {
+      statusCode: 200,
+      message: 'User logged out successfully.',
+      success: true,
+    };
   }
 }

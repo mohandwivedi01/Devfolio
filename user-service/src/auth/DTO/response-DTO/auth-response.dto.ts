@@ -1,22 +1,28 @@
 import { ResponseDTO } from './common.dto';
 
-export interface UserDTO {
+interface UserDTO {
   id: string;
   name: string;
   email: string;
+  bioSummary?: string | null;
+  profilePictureUrl?: string | null;
 }
 
-export interface Data {
+interface SignupResponseData {
   accessToken: string;
+  refreshToken: string;
   user: UserDTO;
 }
 
-export interface SignupResponse extends ResponseDTO {
-  data: Data;
-}
+export type SignupResponseDTO = ResponseDTO<SignupResponseData>; 
 
-export interface SignupResponseDTO {
+export type UpdateUserResponseDTO = ResponseDTO<SignupResponseData>; 
+
+
+interface SigninResponse {
+  accessToken: string;
   refreshToken: string;
-  response: SignupResponse;
+  user: UserDTO;
 }
 
+export type SigninResponseDTO = ResponseDTO<SigninResponse>;

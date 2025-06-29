@@ -24,25 +24,6 @@ export class AuthController {
       private readonly profileService: ClientProxy,
   ) {}
 
-  @Get('abc')
-  async test() {
-    try {
-      console.log('**********');
-      return await firstValueFrom(
-        this.profileService.send({ cmd: 'testing' }, {}),
-      )
-    } catch (error: any) {
-      console.log("error: ",error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.BAD_REQUEST,
-          message: error.message,
-          success: false,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
 
   @Post('signup')
   async signup(

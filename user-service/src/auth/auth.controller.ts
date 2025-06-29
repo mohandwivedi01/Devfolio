@@ -1,7 +1,13 @@
 import { Controller } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { MessagePattern, RpcException } from '@nestjs/microservices';
-import { IAccessToken, ISigninUserDTO, ISignupUserDTO } from './DTO/index';
+import {
+  GenerateAccessTokenDTO,
+  ISigninUserDTO,
+  ISignupUserDTO,
+  ILogoutUserDTO,
+  IValidateTokenDTO,
+} from './DTO/index';
 import { IUserChangePassword } from './DTO/changePassword.dto';
 import { IUserInfoDTO } from './DTO/updateUser.dto';
 
@@ -33,6 +39,30 @@ export class AuthController {
     }
   }
 
+  @MessagePattern({ cmd: 'validateUser' })
+  async validateUser(data: IValidateTokenDTO) {
+    try {
+      return await this.authService.validateUser(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new RpcException(error.message);
+      }
+      throw new RpcException('something went wrong while signing up.');
+    }
+  }
+
+  @MessagePattern({ cmd: 'getAccessToken' })
+  async getAccessToken(data: GenerateAccessTokenDTO) {
+    try {
+      return await this.authService.reGenerateAccessToken(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new RpcException(error.message);
+      }
+      throw new RpcException('something went wrong generating access token.');
+    }
+  }
+
   @MessagePattern({ cmd: 'changePassword' })
   async changePassword(data: IUserChangePassword) {
     try {
@@ -54,6 +84,18 @@ export class AuthController {
         throw new RpcException(error.message);
       }
       throw new RpcException('something went wrong while signing up.');
+    }
+  }
+
+  @MessagePattern({ cmd: 'logout' })
+  async logoutUser(data: ILogoutUserDTO) {
+    try {
+      return await this.authService.logoutUser(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new RpcException(error.message);
+      }
+      throw new RpcException('something went wrong while logout.');
     }
   }
 }
