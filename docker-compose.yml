@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+  # image: rabbitmq:3-management
+    image: rabbitmq:alpine
     container_name: rabbitmq
     ports:
       - "5672:5672"     # RabbitMQ main protocol
@@ -10,4 +11,15 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-      
+
+  redis:
+    image: redis:alpine
+    container_name: redis_db
+    ports:
+      - "6379:6379"     # Redis default port
+    volumes:
+      - redis-data:/data
+    restart: always
+
+volumes:
+  redis-data:

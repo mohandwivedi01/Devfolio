@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/schema/auth.schema';
 import { JwtModule } from '@nestjs/jwt';
+import { RedisHelper } from 'src/redis/redis.helper';
 
 @Global()
 @Module({
@@ -21,6 +22,6 @@ import { JwtModule } from '@nestjs/jwt';
     JwtModule.register({}),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, RedisHelper],
 })
 export class AuthModule {}
