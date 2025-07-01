@@ -7,6 +7,8 @@ import {
   ISignupUserDTO,
   ILogoutUserDTO,
   IValidateTokenDTO,
+  SendOtpDTP,
+  VerifyOtpDTP,
 } from './DTO/index';
 import { IUserChangePassword } from './DTO/changePassword.dto';
 import { IUserInfoDTO } from './DTO/updateUser.dto';
@@ -96,6 +98,30 @@ export class AuthController {
         throw new RpcException(error.message);
       }
       throw new RpcException('something went wrong while logout.');
+    }
+  }
+
+  @MessagePattern({ cmd: 'sendOTP' })
+  async sendOTP(data: SendOtpDTP) {
+    try {
+      return this.authService.sendOTP(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new RpcException(error.message);
+      }
+      throw new RpcException('something went wrong while sending OTP.');
+    }
+  }
+
+  @MessagePattern({ cmd: 'verifyOTP' })
+  async verifyOTP(data: VerifyOtpDTP) {
+    try {
+      return this.authService.verifyOTP(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new RpcException(error.message);
+      }
+      throw new RpcException('something went wrong while verifying OTP.');
     }
   }
 }

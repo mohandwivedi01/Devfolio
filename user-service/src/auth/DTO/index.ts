@@ -4,3 +4,4 @@ export * from './signin.dto';
 export * from './changePassword.dto';
 export * from './updateUser.dto';
 export * from './logout.dto';
+export * from './otp.dto';

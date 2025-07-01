@@ -8,7 +8,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from 'src/schema/auth.schema';
-import { ISignupUserDTO, ISigninUserDTO, IValidateTokenDTO, GenerateAccessTokenDTO, ILogoutUserDTO } from './DTO/index';
+import {
+  ISignupUserDTO,
+  ISigninUserDTO,
+  IValidateTokenDTO,
+  GenerateAccessTokenDTO,
+  ILogoutUserDTO,
+} from './DTO/index';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import {
@@ -21,6 +27,8 @@ import {
 import { IUserInfoDTO } from './DTO/updateUser.dto';
 import { IUserChangePassword } from './DTO/changePassword.dto';
 import { SuccessResponseDTO } from './DTO/response-DTO/common.dto';
+import { SendOtpDTP, VerifyOtpDTP } from './DTO/otp.dto';
+import { RedisHelper } from 'src/redis/redis.helper';
 
 @Injectable()
 export class AuthService {
@@ -28,9 +36,12 @@ export class AuthService {
     @InjectModel(User.name)
     private userModel: Model<User>,
     private readonly jwtService: JwtService,
+    private readonly redisHelper: RedisHelper,
   ) {}
 
-  async reGenerateAccessToken(data: GenerateAccessTokenDTO): Promise<ReGenerateAccessTokenResponseDTO> {
+  async reGenerateAccessToken(
+    data: GenerateAccessTokenDTO,
+  ): Promise<ReGenerateAccessTokenResponseDTO> {
     const { refreshToken } = data;
     let payload: any;
     try {
@@ -74,34 +85,6 @@ export class AuthService {
     };
   }
 
-  async validateUser(data: IValidateTokenDTO): Promise<ValidateUserDTO> {
-    const { userId, token } = data;
-
-    const user = await this.userModel.findById(userId);
-
-    if (!user) {
-      throw new NotFoundException('User not found.');
-    }
-    let payload: any;
-    try {
-      payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.ACCESS_TOKEN_SECRET,
-      });
-    } catch (error) {
-      console.error('Token validation error: ', error.message);
-    }
-
-    if (user._id.toString() !== payload.userId) {
-      throw new BadRequestException('Invalid token');
-    }
-
-    return {
-      userId: user._id.toString(),
-      email: user.email,
-      success: true,
-    };
-  }
-
   async signup(data: ISignupUserDTO): Promise<SignupResponseDTO> {
     const existingUser = await this.userModel.findOne({
       email: data.email,
@@ -135,7 +118,7 @@ export class AuthService {
       },
       {
         secret: process.env.REFRESH_TOKEN_SECRET,
-        expiresIn: '30d',
+        expiresIn: '7d',
       },
     );
 
@@ -146,11 +129,11 @@ export class AuthService {
     const savedUser = await user.save();
 
     return {
+      refreshToken,
       statusCode: 200,
       message: 'User signed up successfully.',
       data: {
         accessToken,
-        refreshToken,
         user: {
           id: savedUser._id.toString(),
           name: savedUser.name,
@@ -194,7 +177,7 @@ export class AuthService {
       },
       {
         secret: process.env.REFRESH_TOKEN_SECRET,
-        expiresIn: '30d',
+        expiresIn: '7d',
       },
     );
 
@@ -209,17 +192,19 @@ export class AuthService {
     );
 
     if (!savedUser) {
-      throw new InternalServerErrorException('Something went wrong while signing up.');
+      throw new InternalServerErrorException(
+        'Something went wrong while signing up.',
+      );
     }
 
     return {
+      refreshToken,
       statusCode: 200,
       message: 'User signed n up successfully.',
       data: {
         accessToken,
-        refreshToken,
         user: {
-          id: (savedUser._id).toString(),
+          id: savedUser._id.toString(),
           name: savedUser.name,
           email: savedUser.email,
           bioSummary: savedUser?.bioSummary ?? null,
@@ -285,14 +270,16 @@ export class AuthService {
       });
 
       if (!updatedUser) {
-      throw new InternalServerErrorException('Something went wrong while signing up.');
-    }
+        throw new InternalServerErrorException(
+          'Something went wrong while signing up.',
+        );
+      }
 
       return {
         statusCode: 200,
         message: 'User details updated successfully.',
         data: {
-          id: (updatedUser._id).toString(),
+          id: updatedUser._id.toString(),
           name: updatedUser.name,
           email: updatedUser.email,
           bioSummary: updatedUser?.bioSummary ?? null,
@@ -318,6 +305,89 @@ export class AuthService {
     return {
       statusCode: 200,
       message: 'User logged out successfully.',
+      success: true,
+    };
+  }
+
+  async validateUser(data: IValidateTokenDTO): Promise<ValidateUserDTO> {
+    const { userId, token } = data;
+
+    const user = await this.userModel.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+      });
+    } catch (error) {
+      console.error('Token validation error: ', error.message);
+    }
+
+    if (user._id.toString() !== payload.userId) {
+      throw new BadRequestException('Invalid token');
+    }
+
+    return {
+      userId: user._id.toString(),
+      email: user.email,
+      success: true,
+    };
+  }
+
+  async sendOTP(data: SendOtpDTP): Promise<SuccessResponseDTO> {
+    const { email, incident } = data;
+
+    const otp = (Math.floor(Math.random() * 900000) + 100000).toString();
+    const user = await this.userModel.findOne({ email });
+
+    if (user) {
+      throw new NotFoundException('user already exist with this email.');
+    }
+
+    const { expired, ttl } = await this.redisHelper.otpValidate(
+      `${email}${incident}`,
+    );
+
+    if (!expired) {
+      throw new BadRequestException(
+        `Please wait for ${ttl} seconds before re-sending OTP.`,
+      );
+    }
+
+    await this.redisHelper.set(`${email}${incident}`, otp, 5 * 60);
+
+    console.log('-----------OTP----------: ', otp);
+
+    //send email to user with OTP.
+
+    return {
+      statusCode: 200,
+      message: 'OTP sended successfully.',
+      success: true,
+    };
+  }
+
+  async verifyOTP(data: VerifyOtpDTP): Promise<SuccessResponseDTO> {
+    const { email, incident, otp } = data;
+
+    const fetchedOTP = await this.redisHelper.get(`${email}${incident}`);
+
+    if (!fetchedOTP) {
+      throw new BadRequestException('OTP not found.');
+    }
+
+    if (fetchedOTP === otp) {
+      await this.redisHelper.delete(`${email}${incident}`);
+    } else {
+      throw new BadRequestException('Invalid OTP.');
+    }
+
+    return {
+      statusCode: 200,
+      message: 'OTP sended successfully.',
       success: true,
     };
   }

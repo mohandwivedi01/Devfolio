@@ -10,19 +10,21 @@ interface UserDTO {
 
 interface SignupResponseData {
   accessToken: string;
-  refreshToken: string;
   user: UserDTO;
 }
 
-export type SignupResponseDTO = ResponseDTO<SignupResponseData>; 
+export interface SignupResponseDTO extends ResponseDTO<SignupResponseData> {
+  refreshToken: string;
+} 
 
 export type UpdateUserResponseDTO = ResponseDTO<SignupResponseData>; 
 
 
 interface SigninResponse {
   accessToken: string;
-  refreshToken: string;
   user: UserDTO;
 }
 
-export type SigninResponseDTO = ResponseDTO<SigninResponse>;
+export interface SigninResponseDTO extends  ResponseDTO<SigninResponse> {
+  refreshToken: string;
+}
