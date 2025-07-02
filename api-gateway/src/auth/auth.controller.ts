@@ -178,7 +178,7 @@ export class AuthController {
   ) {
     try {
       const response = await firstValueFrom(
-        this.userService.send({ cmd: 'logout' }, { id }),
+        this.userService.send({ cmd: 'logout' }, { userId: id }),
       );
       res.clearCookie('refresh_token', {
         httpOnly: true,

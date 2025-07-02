@@ -292,6 +292,7 @@ export class AuthService {
 
   async logoutUser(data: ILogoutUserDTO): Promise<SuccessResponseDTO> {
     const { userId } = data;
+    console.log('User ID for logout:', data);
     const user = await this.userModel.findById(userId);
 
     if (!user) {
