@@ -15,6 +15,7 @@ interface JwtPayload {
 
 export interface RequestWithUser extends Request {
   userId: string;
+  email?: string;
 }
 
 @Injectable()
@@ -30,6 +31,7 @@ export class JwtAuthGuard implements CanActivate {
       ? request.headers['authorization'].split(' ')[1]
       : null;
 
+    console.log('Token:', token);
     if (!token) {
       throw new UnauthorizedException('Token is missing');
     }
@@ -37,10 +39,16 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const decoded = this.JwtService.verify<JwtPayload>(token);
       const user: any = await firstValueFrom(
-        this.userService.send({ cmd: 'validateUser' }, decoded.id),
+        this.userService.send({ cmd: 'validateUser' }, {
+          userId: decoded.id,
+          token: token,
+        }),
       );
 
+      console.log('Decoded user:', user);
+
       request.userId = user.id;
+      request.email = user.email;
 
       return true;
     } catch (error: unknown) {
