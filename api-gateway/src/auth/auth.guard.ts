@@ -31,7 +31,6 @@ export class JwtAuthGuard implements CanActivate {
       ? request.headers['authorization'].split(' ')[1]
       : null;
 
-    console.log('Token:', token);
     if (!token) {
       throw new UnauthorizedException('Token is missing');
     }
@@ -44,8 +43,6 @@ export class JwtAuthGuard implements CanActivate {
           token: token,
         }),
       );
-
-      console.log('Decoded user:', user);
 
       request.userId = user.id;
       request.email = user.email;
