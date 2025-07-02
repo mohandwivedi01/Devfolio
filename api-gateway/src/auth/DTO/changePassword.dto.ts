@@ -16,6 +16,5 @@ export class ChangePasswordDTO {
     @IsNotEmpty()
     @MinLength(8, { message: 'Password should be at least 8 char.' })
     @MaxLength(32, { message: 'Password should not greater than 32 char.' })
-    password: string;
     newPassword: string;
 }

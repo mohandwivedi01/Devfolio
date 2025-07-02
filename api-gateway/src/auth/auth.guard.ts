@@ -15,6 +15,7 @@ interface JwtPayload {
 
 export interface RequestWithUser extends Request {
   userId: string;
+  email?: string;
 }
 
 @Injectable()
@@ -37,10 +38,14 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const decoded = this.JwtService.verify<JwtPayload>(token);
       const user: any = await firstValueFrom(
-        this.userService.send({ cmd: 'validateUser' }, decoded.id),
+        this.userService.send({ cmd: 'validateUser' }, {
+          userId: decoded.id,
+          token: token,
+        }),
       );
 
       request.userId = user.id;
+      request.email = user.email;
 
       return true;
     } catch (error: unknown) {

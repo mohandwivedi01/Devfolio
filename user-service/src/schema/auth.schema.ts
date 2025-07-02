@@ -32,6 +32,12 @@ export class User {
     profilePictureUrl: string
 
     @Prop({
+        type: Boolean,
+        default: false,
+    })
+    isEmailVerified: boolean
+
+    @Prop({
         type: String,
     })
     refreshToken: string

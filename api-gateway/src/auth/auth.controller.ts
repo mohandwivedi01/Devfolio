@@ -10,6 +10,7 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
@@ -23,6 +24,7 @@ import {
 } from './DTO/index';
 import { Response } from 'express';
 import { Request } from 'express';
+import { JwtAuthGuard } from './auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -95,7 +97,9 @@ export class AuthController {
     }
   }
 
-  @Post('generateAccessToken')
+  
+  @Get('generateAccessToken')
+  @UseGuards(JwtAuthGuard)
   async generateAccessToken(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -129,6 +133,7 @@ export class AuthController {
   }
 
   @Patch('updateUser')
+  @UseGuards(JwtAuthGuard)
   async updateUser(@Body() data: UpdateUserDTO) {
     try {
       return await firstValueFrom(
@@ -147,6 +152,7 @@ export class AuthController {
   }
 
   @Patch('changePassword')
+  @UseGuards(JwtAuthGuard)
   async changePassword(@Body() data: ChangePasswordDTO): Promise<any> {
     try {
       return await firstValueFrom(
@@ -165,13 +171,14 @@ export class AuthController {
   }
 
   @Get('logout/:id')
+  @UseGuards(JwtAuthGuard)
   async logoutUser(
     @Param('id') id: string,
     @Res({ passthrough: true }) res: Response,
   ) {
     try {
       const response = await firstValueFrom(
-        this.userService.send({ cmd: 'logout' }, { id }),
+        this.userService.send({ cmd: 'logout' }, { userId: id }),
       );
       res.clearCookie('refresh_token', {
         httpOnly: true,
@@ -192,6 +199,7 @@ export class AuthController {
   }
 
   @Post('sendOtp')
+  @UseGuards(JwtAuthGuard)
   async sendOtp(@Body() data: SendOtpDTP) {
     try {
       return await firstValueFrom(
@@ -210,6 +218,7 @@ export class AuthController {
   }
 
   @Post('verifyOTP')
+  @UseGuards(JwtAuthGuard)
   async verifyOtp(@Body() data: VerifyOtpDTP) {
     try {
       return await firstValueFrom(
@@ -225,5 +234,5 @@ export class AuthController {
         HttpStatus.BAD_REQUEST,
       );
     }
-  }
+  } 
 }

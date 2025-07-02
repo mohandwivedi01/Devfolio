@@ -27,7 +27,7 @@ import {
 import { IUserInfoDTO } from './DTO/updateUser.dto';
 import { IUserChangePassword } from './DTO/changePassword.dto';
 import { SuccessResponseDTO } from './DTO/response-DTO/common.dto';
-import { SendOtpDTP, VerifyOtpDTP } from './DTO/otp.dto';
+import { IncidentType, SendOtpDTP, VerifyOtpDTP } from './DTO/otp.dto';
 import { RedisHelper } from 'src/redis/redis.helper';
 
 @Injectable()
@@ -52,9 +52,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
 
-    const user = await this.userModel.findById(payload.userId);
-
-    if (!user || user.refreshToken) {
+    const user = await this.userModel.findById(payload.id);
+    
+    if (!user || !user.refreshToken) {
       throw new NotFoundException(
         'Refresh token not found or user does not exist.',
       );
@@ -68,11 +68,11 @@ export class AuthService {
 
     const newAccessToken = await this.jwtService.signAsync(
       {
-        userId: user._id,
+        id: user._id,
       },
       {
         secret: process.env.ACCESS_TOKEN_SECRET,
-        expiresIn: 'id',
+        expiresIn: '1d',
       },
     );
 
@@ -86,25 +86,24 @@ export class AuthService {
   }
 
   async signup(data: ISignupUserDTO): Promise<SignupResponseDTO> {
-    const existingUser = await this.userModel.findOne({
-      email: data.email,
-    });
+    const { email, name, password } = data;
+    const existingUser = await this.userModel.findOne({ email });
 
     if (existingUser) {
       throw new BadRequestException('User already exists with this email id');
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = new this.userModel({
-      email: data.email,
-      name: data.name,
+      email,
+      name,
       password: hashedPassword,
     });
 
     const accessToken = await this.jwtService.signAsync(
       {
-        userId: user._id,
+        id: user._id,
       },
       {
         secret: process.env.ACCESS_TOKEN_SECRET,
@@ -114,7 +113,7 @@ export class AuthService {
 
     const refreshToken = await this.jwtService.signAsync(
       {
-        userId: user._id,
+        id: user._id,
       },
       {
         secret: process.env.REFRESH_TOKEN_SECRET,
@@ -163,7 +162,7 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(
       {
-        userId: existingUser._id,
+        id: existingUser._id,
       },
       {
         secret: process.env.ACCESS_TOKEN_SECRET,
@@ -173,7 +172,7 @@ export class AuthService {
 
     const refreshToken = await this.jwtService.signAsync(
       {
-        userId: existingUser._id,
+        id: existingUser._id,
       },
       {
         secret: process.env.REFRESH_TOKEN_SECRET,
@@ -293,6 +292,7 @@ export class AuthService {
 
   async logoutUser(data: ILogoutUserDTO): Promise<SuccessResponseDTO> {
     const { userId } = data;
+    console.log('User ID for logout:', data);
     const user = await this.userModel.findById(userId);
 
     if (!user) {
@@ -326,7 +326,7 @@ export class AuthService {
       console.error('Token validation error: ', error.message);
     }
 
-    if (user._id.toString() !== payload.userId) {
+    if (user._id.toString() !== payload.id) {
       throw new BadRequestException('Invalid token');
     }
 
@@ -373,15 +373,9 @@ export class AuthService {
   async verifyOTP(data: VerifyOtpDTP): Promise<SuccessResponseDTO> {
     const { email, incident, otp } = data;
 
-    const fetchedOTP = await this.redisHelper.get(`${email}${incident}`);
+    const isOTPValid = await this.verifyOtp({ email, incident, otp });
 
-    if (!fetchedOTP) {
-      throw new BadRequestException('OTP not found.');
-    }
-
-    if (fetchedOTP === otp) {
-      await this.redisHelper.delete(`${email}${incident}`);
-    } else {
+    if (!isOTPValid) {
       throw new BadRequestException('Invalid OTP.');
     }
 
@@ -391,4 +385,24 @@ export class AuthService {
       success: true,
     };
   }
+
+  async verifyOtp({
+    email,
+    incident,
+    otp,
+  }: VerifyOtpDTP): Promise<boolean>{
+    const fetchedOTP = await this.redisHelper.get(`${email}${incident}`);
+    
+    if (!fetchedOTP) {
+      throw new BadRequestException('OTP not found.');
+    }
+
+    if (fetchedOTP === otp) {
+      await this.redisHelper.delete(`${email}${incident}`);
+      return true;
+    } else {
+      throw new BadRequestException('Invalid OTP.');
+    }
+  }
 }
+ 
