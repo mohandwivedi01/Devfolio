@@ -5,8 +5,8 @@ import { Contribution, contributionSchema } from 'src/schema/githubSchema/contri
 import { Github, githubSchema } from 'src/schema/githubSchema/github.schema';
 import { Language, languageSchema } from 'src/schema/githubSchema/language.schema';
 import { Profile, profileSchema } from 'src/schema/profile.schema';
-import { ProfileController } from './profile.controller';
-import { ProfileService } from './profile.service';
+import { ProfileController } from './github.controller';
+import { ProfileService } from './github.service';
 import { Repository, repositorySchema } from 'src/schema/githubSchema/repository.schema';
 
 @Global()

@@ -20,6 +20,7 @@ export class Github extends Document {
   @Prop() numberOfFollowers: number;
   @Prop() joiningDate: Date;
   @Prop() numberOfStars: number;
+  @Prop() lastSyncedAt: Date
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Repository' }],
