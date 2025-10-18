@@ -6,9 +6,10 @@ import { MessagePattern, RpcException } from '@nestjs/microservices';
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  @MessagePattern({ cmd: 'testing' })
+  @MessagePattern({ cmd: 'github' })
   async getUserDetails(data: { userName: string }) {
     try {
+      console.log('Received data:', data);
       return this.profileService.fetchUserGithubData(data);
     } catch (error) {
       if (error instanceof Error) {

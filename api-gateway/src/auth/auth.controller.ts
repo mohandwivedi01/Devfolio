@@ -97,6 +97,37 @@ export class AuthController {
     }
   }
 
+  @Post('githubSignin')
+  async githubSignin(
+    @Body() data: SigninUserDTO,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      const response = await firstValueFrom(
+        this.userService.send({ cmd: 'signin' }, { ...data }),
+      );
+      const { refreshToken, ...result } = response;
+
+      res.cookie('refresh_token', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 10000,
+      });
+
+      return result;
+    } catch (error: any) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: error.message,
+          success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   
   @Get('generateAccessToken')
   @UseGuards(JwtAuthGuard)
@@ -235,4 +266,23 @@ export class AuthController {
       );
     }
   } 
+
+  @Get('github/:userName')
+  async getGithubProfile(@Param('userName') userName: string) {
+    try {
+      console.log('Fetching GitHub profile for:', userName);
+      return await firstValueFrom(
+        this.profileService.send({ cmd: 'github' }, { userName }),
+      );
+    } catch (error: any) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: error.message,
+          success: false,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }
